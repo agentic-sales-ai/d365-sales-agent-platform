@@ -72,12 +72,24 @@ Status:
 Activities:
 {activitiesText}
 
-Provide:
-1. Executive summary
-2. Key risks
-3. Recommended next actions
+Return ONLY valid JSON.
+
+Required fields:
+- summary
+- risks
+- nextActions
+
+Example format:
+summary = string
+risks = array of strings
+nextActions = array of strings
+
+Do not include markdown.
+Do not include explanations outside JSON.
 
 Keep response concise and business-focused.
+Do not include markdown.
+Do not include explanations outside JSON.
 """;
 
         var requestBody = new
@@ -98,8 +110,14 @@ Keep response concise and business-focused.
                 "https://api.openai.com/v1/chat/completions",
                 requestBody);
 
-        response.EnsureSuccessStatusCode();
+if (!response.IsSuccessStatusCode)
+{
+    var error =
+        await response.Content.ReadAsStringAsync();
 
+    throw new Exception(
+        $"OpenAI API Error: {error}");
+}
         var json =
             await response.Content.ReadAsStringAsync();
 
@@ -113,9 +131,19 @@ Keep response concise and business-focused.
                 .GetProperty("content")
                 .GetString();
 
-        return new OpportunityInsightsModel
+        if (string.IsNullOrWhiteSpace(content))
+{
+    return new OpportunityInsightsModel();
+}
+
+var insights =
+    JsonSerializer.Deserialize<OpportunityInsightsModel>(
+        content,
+        new JsonSerializerOptions
         {
-            Summary = content ?? string.Empty
-        };
+            PropertyNameCaseInsensitive = true
+        });
+
+return insights ?? new OpportunityInsightsModel();
     }
 }

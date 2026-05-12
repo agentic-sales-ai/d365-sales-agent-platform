@@ -12,14 +12,21 @@ public class DataverseController : ControllerBase
     private readonly IOpportunityInsightsService
         _opportunityInsightsService;
 
+    private readonly IFollowUpEmailService
+        _followUpEmailService;
+
     public DataverseController(
         IDataverseService dataverseService,
-        IOpportunityInsightsService opportunityInsightsService)
+        IOpportunityInsightsService opportunityInsightsService,
+        IFollowUpEmailService followUpEmailService)
     {
         _dataverseService = dataverseService;
 
         _opportunityInsightsService =
             opportunityInsightsService;
+
+        _followUpEmailService =
+            followUpEmailService;
     }
 
     [HttpGet("test")]
@@ -77,6 +84,27 @@ public class DataverseController : ControllerBase
             var result =
                 await _opportunityInsightsService
                     .GenerateInsightsAsync(id);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                Error = ex.Message
+            });
+        }
+    }
+
+    [HttpGet("opportunity/{id}/followup-email")]
+    public async Task<IActionResult> GenerateFollowUpEmail(
+        Guid id)
+    {
+        try
+        {
+            var result =
+                await _followUpEmailService
+                    .GenerateAsync(id);
 
             return Ok(result);
         }

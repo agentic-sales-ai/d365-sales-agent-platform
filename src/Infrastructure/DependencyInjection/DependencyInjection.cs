@@ -17,6 +17,11 @@ public static class DependencyInjection
             IOpportunityInsightsService,
             OpportunityInsightsService>();
 
+
+        services.AddScoped<
+            IFollowUpEmailService,
+            FollowUpEmailService>();
+
         return services;
     }
 }

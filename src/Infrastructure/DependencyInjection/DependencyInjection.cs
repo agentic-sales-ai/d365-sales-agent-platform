@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Infrastructure.Tools;
 
 namespace Infrastructure.DependencyInjection;
 
@@ -28,6 +29,10 @@ public static class DependencyInjection
         services.AddScoped<
             IAgentOrchestrator,
             AgentOrchestrator>();
+
+        services.AddScoped<
+            IAgentToolRegistry,
+            AgentToolRegistry>();
         
         services.AddScoped<
             IOpportunityRiskService,
@@ -36,6 +41,10 @@ public static class DependencyInjection
         services.AddScoped<
             IOpportunityContextService,
             OpportunityContextService>();
+        
+        services.AddScoped<
+            IAgentTool,
+            GetOpportunityTool>();
         
         return services;
     }

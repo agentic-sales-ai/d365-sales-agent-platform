@@ -7,4 +7,7 @@ public class OpportunityAgentResponseModel
 
     public FollowUpEmailModel FollowUpEmail
         { get; set; } = new();
+
+    public OpportunityRiskAssessmentModel RiskAssessment
+        { get; set; } = new();
 }

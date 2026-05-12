@@ -29,6 +29,10 @@ public static class DependencyInjection
             IAgentOrchestrator,
             AgentOrchestrator>();
         
+        services.AddScoped<
+            IOpportunityRiskService,
+            OpportunityRiskService>();
+        
         return services;
     }
 }

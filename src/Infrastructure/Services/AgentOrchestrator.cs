@@ -12,14 +12,20 @@ public class AgentOrchestrator
     private readonly IFollowUpEmailService
         _followUpEmailService;
 
+    private readonly IOpportunityRiskService
+        _riskService;
+
     public AgentOrchestrator(
         IOpportunityInsightsService insightsService,
-        IFollowUpEmailService followUpEmailService)
+        IFollowUpEmailService followUpEmailService,
+        IOpportunityRiskService riskService)
     {
         _insightsService = insightsService;
 
         _followUpEmailService =
             followUpEmailService;
+
+        _riskService = riskService;
     }
 
     public async Task<OpportunityAgentResponseModel>
@@ -36,11 +42,18 @@ public class AgentOrchestrator
                 .GenerateAsync(
                     opportunityId);
 
+        var risk =
+            await _riskService
+                .AssessRiskAsync(
+                    opportunityId);
+
         return new OpportunityAgentResponseModel
         {
             Insights = insights,
 
-            FollowUpEmail = email
+            FollowUpEmail = email,
+
+            RiskAssessment = risk
         };
     }
 }

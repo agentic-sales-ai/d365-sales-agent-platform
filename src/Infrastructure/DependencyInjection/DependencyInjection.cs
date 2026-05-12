@@ -50,6 +50,10 @@ public static class DependencyInjection
             IAiToolOrchestrator,
             AiToolOrchestrator>();
 
+        services.AddScoped<
+            IPlannerRuntime,
+            PlannerRuntime>();
+
         return services;
     }
 }

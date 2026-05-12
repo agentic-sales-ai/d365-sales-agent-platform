@@ -1,3 +1,4 @@
+using Microsoft.Xrm.Sdk;
 using Application.Common.Models;
 using System.Linq;
 using Application.Common.Interfaces;
@@ -42,10 +43,22 @@ TenantId={settings.TenantId};
         }
 
         return new OpportunityModel
-        {
-            Id = entity.Id,
-            Name = entity.GetAttributeValue<string>("name") ?? string.Empty
-        };
+{
+    Id = entity.Id,
+    Name = entity.GetAttributeValue<string>("name") ?? string.Empty,
+
+    EstimatedValue =
+        entity.GetAttributeValue<Money>("estimatedvalue")?.Value ?? 0,
+
+    CustomerName =
+        entity.GetAttributeValue<EntityReference>("customerid")?.Name
+        ?? string.Empty,
+
+    Status =
+        entity.FormattedValues.Contains("statecode")
+            ? entity.FormattedValues["statecode"]
+            : string.Empty
+};
     }
 
     public async Task<List<ActivityModel>> GetOpportunityActivitiesAsync(

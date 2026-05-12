@@ -54,6 +54,10 @@ public static class DependencyInjection
             IPlannerRuntime,
             PlannerRuntime>();
 
+        services.AddScoped<
+            IPlannerAiService,
+            PlannerAiService>();
+
         return services;
     }
 }

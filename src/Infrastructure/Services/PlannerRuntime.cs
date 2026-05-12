@@ -9,29 +9,17 @@ public class PlannerRuntime
     private readonly IAgentToolRegistry
         _toolRegistry;
 
-    private readonly IOpportunityInsightsService
-        _insightsService;
-
-    private readonly IFollowUpEmailService
-        _followUpEmailService;
-
-    private readonly IOpportunityRiskService
-        _riskService;
+    private readonly IPlannerAiService
+        _plannerAiService;
 
     public PlannerRuntime(
         IAgentToolRegistry toolRegistry,
-        IOpportunityInsightsService insightsService,
-        IFollowUpEmailService followUpEmailService,
-        IOpportunityRiskService riskService)
+        IPlannerAiService plannerAiService)
     {
         _toolRegistry = toolRegistry;
 
-        _insightsService = insightsService;
-
-        _followUpEmailService =
-            followUpEmailService;
-
-        _riskService = riskService;
+        _plannerAiService =
+            plannerAiService;
     }
 
     public async Task<PlannerExecutionResponseModel>
@@ -39,89 +27,49 @@ public class PlannerRuntime
     {
         var workflowId = Guid.NewGuid();
 
-        var steps =
+        var executionSteps =
             new List<PlannerExecutionStepModel>();
 
-        var opportunityId =
-            Guid.Parse(
-                "a09c2889-a016-eb11-a813-002248029f77");
+        var plan =
+            await _plannerAiService
+                .GeneratePlanAsync(
+                    userPrompt);
 
-        var getOpportunityTool =
-            _toolRegistry.GetTool(
-                "GetOpportunity");
+        foreach (var planStep in plan.Steps)
+        {
+            var tool =
+                _toolRegistry.GetTool(
+                    planStep.ToolName);
 
-        var opportunityResult =
-            await getOpportunityTool.ExecuteAsync(
-                new Dictionary<string, object>
+            object? result = null;
+
+            if (tool.Name == "GetOpportunity")
+            {
+                result =
+                    await tool.ExecuteAsync(
+                        new Dictionary<string, object>
+                        {
+                            {
+                                "opportunityId",
+                                "a09c2889-a016-eb11-a813-002248029f77"
+                            }
+                        });
+            }
+
+            executionSteps.Add(
+                new PlannerExecutionStepModel
                 {
-                    {
-                        "opportunityId",
-                        opportunityId
-                    }
+                    StepNumber =
+                        planStep.StepNumber,
+
+                    ToolName =
+                        planStep.ToolName,
+
+                    Status = "Completed",
+
+                    Result = result
                 });
-
-        steps.Add(
-            new PlannerExecutionStepModel
-            {
-                StepNumber = 1,
-
-                ToolName = "GetOpportunity",
-
-                Status = "Completed",
-
-                Result = opportunityResult
-            });
-
-        var insights =
-            await _insightsService
-                .GenerateInsightsAsync(
-                    opportunityId);
-
-        steps.Add(
-            new PlannerExecutionStepModel
-            {
-                StepNumber = 2,
-
-                ToolName = "GenerateInsights",
-
-                Status = "Completed",
-
-                Result = insights
-            });
-
-        var risk =
-            await _riskService
-                .AssessRiskAsync(
-                    opportunityId);
-
-        steps.Add(
-            new PlannerExecutionStepModel
-            {
-                StepNumber = 3,
-
-                ToolName = "AssessRisk",
-
-                Status = "Completed",
-
-                Result = risk
-            });
-
-        var email =
-            await _followUpEmailService
-                .GenerateAsync(
-                    opportunityId);
-
-        steps.Add(
-            new PlannerExecutionStepModel
-            {
-                StepNumber = 4,
-
-                ToolName = "GenerateFollowUpEmail",
-
-                Status = "Completed",
-
-                Result = email
-            });
+        }
 
         return new PlannerExecutionResponseModel
         {
@@ -130,7 +78,7 @@ public class PlannerRuntime
             ExecutedAtUtc =
                 DateTime.UtcNow,
 
-            Steps = steps
+            Steps = executionSteps
         };
     }
 }

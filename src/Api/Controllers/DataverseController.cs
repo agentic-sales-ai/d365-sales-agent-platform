@@ -15,10 +15,14 @@ public class DataverseController : ControllerBase
     private readonly IFollowUpEmailService
         _followUpEmailService;
 
+    private readonly IAgentOrchestrator
+        _agentOrchestrator;
+
     public DataverseController(
         IDataverseService dataverseService,
         IOpportunityInsightsService opportunityInsightsService,
-        IFollowUpEmailService followUpEmailService)
+        IFollowUpEmailService followUpEmailService,
+        IAgentOrchestrator agentOrchestrator)
     {
         _dataverseService = dataverseService;
 
@@ -27,6 +31,9 @@ public class DataverseController : ControllerBase
 
         _followUpEmailService =
             followUpEmailService;
+
+        _agentOrchestrator =
+            agentOrchestrator;
     }
 
     [HttpGet("test")]
@@ -105,6 +112,27 @@ public class DataverseController : ControllerBase
             var result =
                 await _followUpEmailService
                     .GenerateAsync(id);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                Error = ex.Message
+            });
+        }
+    }
+
+    [HttpGet("opportunity/{id}/workflow")]
+    public async Task<IActionResult> ExecuteWorkflow(
+        Guid id)
+    {
+        try
+        {
+            var result =
+                await _agentOrchestrator
+                    .ExecuteOpportunityWorkflowAsync(id);
 
             return Ok(result);
         }

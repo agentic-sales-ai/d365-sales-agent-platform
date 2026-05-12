@@ -17,11 +17,18 @@ public static class DependencyInjection
             IOpportunityInsightsService,
             OpportunityInsightsService>();
 
-
         services.AddScoped<
             IFollowUpEmailService,
             FollowUpEmailService>();
 
+        services.AddScoped<
+            IEmailDeliveryService,
+            GraphEmailDeliveryService>();
+        
+        services.AddScoped<
+            IAgentOrchestrator,
+            AgentOrchestrator>();
+        
         return services;
     }
 }

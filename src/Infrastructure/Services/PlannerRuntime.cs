@@ -41,20 +41,12 @@ public class PlannerRuntime
                 _toolRegistry.GetTool(
                     planStep.ToolName);
 
-            object? result = null;
+            var parameters =
+                tool.GetDefaultParameters();
 
-            if (tool.Name == "GetOpportunity")
-            {
-                result =
-                    await tool.ExecuteAsync(
-                        new Dictionary<string, object>
-                        {
-                            {
-                                "opportunityId",
-                                "a09c2889-a016-eb11-a813-002248029f77"
-                            }
-                        });
-            }
+            var result =
+                await tool.ExecuteAsync(
+                    parameters);
 
             executionSteps.Add(
                 new PlannerExecutionStepModel

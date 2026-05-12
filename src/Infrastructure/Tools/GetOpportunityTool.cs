@@ -20,6 +20,18 @@ public class GetOpportunityTool
     public string Description =>
         "Retrieves an opportunity from Dynamics 365 Sales.";
 
+    public Dictionary<string, object>
+        GetDefaultParameters()
+    {
+        return new Dictionary<string, object>
+        {
+            {
+                "opportunityId",
+                "a09c2889-a016-eb11-a813-002248029f77"
+            }
+        };
+    }
+
     public async Task<object> ExecuteAsync(
         Dictionary<string, object> parameters)
     {

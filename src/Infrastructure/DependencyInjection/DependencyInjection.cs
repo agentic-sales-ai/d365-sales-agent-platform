@@ -33,6 +33,10 @@ public static class DependencyInjection
             IOpportunityRiskService,
             OpportunityRiskService>();
         
+        services.AddScoped<
+            IOpportunityContextService,
+            OpportunityContextService>();
+        
         return services;
     }
 }

@@ -1,6 +1,5 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 using Application.Common.Interfaces;
 using Application.Common.Models;
@@ -12,17 +11,18 @@ namespace Infrastructure.Services;
 public class OpportunityInsightsService
     : IOpportunityInsightsService
 {
-    private readonly IDataverseService _dataverseService;
-
     private readonly OpenAIOptions _options;
 
     private readonly HttpClient _httpClient;
 
+    private readonly IOpportunityContextService
+        _contextService;
+
     public OpportunityInsightsService(
-        IDataverseService dataverseService,
+        IOpportunityContextService contextService,
         IOptions<OpenAIOptions> options)
     {
-        _dataverseService = dataverseService;
+        _contextService = contextService;
 
         _options = options.Value;
 
@@ -37,18 +37,15 @@ public class OpportunityInsightsService
     public async Task<OpportunityInsightsModel>
         GenerateInsightsAsync(Guid opportunityId)
     {
-        var opportunity =
-            await _dataverseService.GetOpportunityAsync(
-                opportunityId);
+        var context =
+            await _contextService
+                .BuildContextAsync(opportunityId);
 
-        var activities =
-            await _dataverseService
-                .GetOpportunityActivitiesAsync(
-                    opportunityId);
+        var opportunity = context.Opportunity;
 
         var activitiesText = string.Join(
             "\n",
-            activities.Select(a =>
+            context.Activities.Select(a =>
                 $"- {a.ActivityType}: {a.Subject}"));
 
         var prompt =
@@ -58,16 +55,16 @@ You are an enterprise sales AI assistant.
 Analyze the following Dynamics 365 opportunity.
 
 Opportunity Name:
-{opportunity?.Name}
+{opportunity.Name}
 
 Customer:
-{opportunity?.CustomerName}
+{opportunity.CustomerName}
 
 Estimated Value:
-{opportunity?.EstimatedValue}
+{opportunity.EstimatedValue}
 
 Status:
-{opportunity?.Status}
+{opportunity.Status}
 
 Activities:
 {activitiesText}
@@ -84,10 +81,6 @@ summary = string
 risks = array of strings
 nextActions = array of strings
 
-Do not include markdown.
-Do not include explanations outside JSON.
-
-Keep response concise and business-focused.
 Do not include markdown.
 Do not include explanations outside JSON.
 """;
@@ -110,14 +103,15 @@ Do not include explanations outside JSON.
                 "https://api.openai.com/v1/chat/completions",
                 requestBody);
 
-if (!response.IsSuccessStatusCode)
-{
-    var error =
-        await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+        {
+            var error =
+                await response.Content.ReadAsStringAsync();
 
-    throw new Exception(
-        $"OpenAI API Error: {error}");
-}
+            throw new Exception(
+                $"OpenAI API Error: {error}");
+        }
+
         var json =
             await response.Content.ReadAsStringAsync();
 
@@ -132,18 +126,18 @@ if (!response.IsSuccessStatusCode)
                 .GetString();
 
         if (string.IsNullOrWhiteSpace(content))
-{
-    return new OpportunityInsightsModel();
-}
-
-var insights =
-    JsonSerializer.Deserialize<OpportunityInsightsModel>(
-        content,
-        new JsonSerializerOptions
         {
-            PropertyNameCaseInsensitive = true
-        });
+            return new OpportunityInsightsModel();
+        }
 
-return insights ?? new OpportunityInsightsModel();
+        var insights =
+            JsonSerializer.Deserialize<OpportunityInsightsModel>(
+                content,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+        return insights ?? new OpportunityInsightsModel();
     }
 }

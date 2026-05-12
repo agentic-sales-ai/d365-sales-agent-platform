@@ -46,6 +46,10 @@ public static class DependencyInjection
             IAgentTool,
             GetOpportunityTool>();
         
+        services.AddScoped<
+            IAiToolOrchestrator,
+            AiToolOrchestrator>();
+
         return services;
     }
 }

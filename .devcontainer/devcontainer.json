@@ -1,0 +1,11 @@
+{
+  "name": "D365 Sales Agent Platform",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:9.0",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/azure-cli:1": {}
+  },
+  "postCreateCommand": "dotnet --version && node --version && az version"
+}

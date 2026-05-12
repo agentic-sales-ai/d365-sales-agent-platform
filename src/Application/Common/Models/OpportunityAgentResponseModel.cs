@@ -2,6 +2,9 @@ namespace Application.Common.Models;
 
 public class OpportunityAgentResponseModel
 {
+    public WorkflowExecutionMetadataModel Metadata
+        { get; set; } = new();
+
     public OpportunityInsightsModel Insights
         { get; set; } = new();
 

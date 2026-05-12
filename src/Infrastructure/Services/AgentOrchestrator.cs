@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 
@@ -32,23 +33,57 @@ public class AgentOrchestrator
         ExecuteOpportunityWorkflowAsync(
             Guid opportunityId)
     {
+        var stopwatch = Stopwatch.StartNew();
+
+        var workflowId = Guid.NewGuid();
+
+        var executedAgents = new List<string>();
+
         var insights =
             await _insightsService
                 .GenerateInsightsAsync(
                     opportunityId);
+
+        executedAgents.Add(
+            "OpportunityInsightsAgent");
 
         var email =
             await _followUpEmailService
                 .GenerateAsync(
                     opportunityId);
 
+        executedAgents.Add(
+            "FollowUpEmailAgent");
+
         var risk =
             await _riskService
                 .AssessRiskAsync(
                     opportunityId);
 
+        executedAgents.Add(
+            "OpportunityRiskAgent");
+
+        stopwatch.Stop();
+
         return new OpportunityAgentResponseModel
         {
+            Metadata =
+                new WorkflowExecutionMetadataModel
+                {
+                    WorkflowId = workflowId,
+
+                    ExecutedAtUtc =
+                        DateTime.UtcNow,
+
+                    DurationMs =
+                        stopwatch.ElapsedMilliseconds,
+
+                    Status = "Completed",
+
+                    ExecutedAgents =
+                        executedAgents
+                },
+
             Insights = insights,
 
             FollowUpEmail = email,

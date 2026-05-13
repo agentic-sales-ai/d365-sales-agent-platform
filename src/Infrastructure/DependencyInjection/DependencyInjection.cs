@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Infrastructure.Tools;
+using Infrastructure.Repositories;
 
 namespace Infrastructure.DependencyInjection;
 
@@ -74,6 +75,14 @@ public static class DependencyInjection
             IAgentTool,
             GenerateFollowUpEmailTool>();
 
+        services.AddScoped<
+            IExecutionPolicyService,
+            ExecutionPolicyService>();
+
+        services.AddSingleton<
+            IWorkflowStateRepository,
+            InMemoryWorkflowStateRepository>();
+        
         return services;
     }
 }

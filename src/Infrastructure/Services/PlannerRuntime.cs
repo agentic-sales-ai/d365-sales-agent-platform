@@ -15,10 +15,18 @@ public class PlannerRuntime
     private readonly IWorkflowStateService
         _workflowStateService;
 
+    private readonly IExecutionPolicyService
+        _policyService;
+
+    private readonly IWorkflowStateRepository
+        _repository;
+
     public PlannerRuntime(
         IAgentToolRegistry toolRegistry,
         IPlannerAiService plannerAiService,
-        IWorkflowStateService workflowStateService)
+        IWorkflowStateService workflowStateService,
+        IExecutionPolicyService policyService,
+        IWorkflowStateRepository repository)
     {
         _toolRegistry = toolRegistry;
 
@@ -27,6 +35,11 @@ public class PlannerRuntime
 
         _workflowStateService =
             workflowStateService;
+
+        _policyService =
+            policyService;
+
+        _repository = repository;
     }
 
     public async Task<PlannerExecutionResponseModel>
@@ -43,6 +56,35 @@ public class PlannerRuntime
 
         foreach (var planStep in plan.Steps)
         {
+            var policyResult =
+                await _policyService
+                    .ValidateAsync(planStep);
+
+            if (!policyResult.IsAllowed)
+            {
+                var blockedStep =
+                    new PlannerExecutionStepModel
+                    {
+                        StepNumber =
+                            planStep.StepNumber,
+
+                        ToolName =
+                            planStep.ToolName,
+
+                        Status = "Blocked",
+
+                        Result =
+                            policyResult.Reason
+                    };
+
+                _workflowStateService
+                    .AddStepResult(
+                        state,
+                        blockedStep);
+
+                continue;
+            }
+
             var tool =
                 _toolRegistry.GetTool(
                     planStep.ToolName);
@@ -95,7 +137,11 @@ public class PlannerRuntime
                     state,
                     planStep.ToolName,
                     result);
+
+            await _repository.SaveAsync(state);
         }
+
+        await _repository.SaveAsync(state);
 
         return new PlannerExecutionResponseModel
         {

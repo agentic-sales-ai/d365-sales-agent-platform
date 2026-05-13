@@ -11,11 +11,17 @@ public class PlannerController : ControllerBase
     private readonly IPlannerRuntime
         _plannerRuntime;
 
+    private readonly IWorkflowStateRepository
+        _repository;
+
     public PlannerController(
-        IPlannerRuntime plannerRuntime)
+        IPlannerRuntime plannerRuntime,
+        IWorkflowStateRepository repository)
     {
         _plannerRuntime =
             plannerRuntime;
+
+        _repository = repository;
     }
 
     [HttpPost("execute")]
@@ -38,5 +44,21 @@ public class PlannerController : ControllerBase
                 Error = ex.Message
             });
         }
+    }
+
+    [HttpGet("workflow/{workflowId}")]
+    public async Task<IActionResult>
+        GetWorkflow(Guid workflowId)
+    {
+        var workflow =
+            await _repository
+                .GetAsync(workflowId);
+
+        if (workflow == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(workflow);
     }
 }

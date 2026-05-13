@@ -12,23 +12,29 @@ public class PlannerRuntime
     private readonly IPlannerAiService
         _plannerAiService;
 
+    private readonly IWorkflowStateService
+        _workflowStateService;
+
     public PlannerRuntime(
         IAgentToolRegistry toolRegistry,
-        IPlannerAiService plannerAiService)
+        IPlannerAiService plannerAiService,
+        IWorkflowStateService workflowStateService)
     {
         _toolRegistry = toolRegistry;
 
         _plannerAiService =
             plannerAiService;
+
+        _workflowStateService =
+            workflowStateService;
     }
 
     public async Task<PlannerExecutionResponseModel>
         ExecutePlanAsync(string userPrompt)
     {
-        var workflowId = Guid.NewGuid();
-
-        var executionSteps =
-            new List<PlannerExecutionStepModel>();
+        var state =
+            _workflowStateService
+                .CreateState(userPrompt);
 
         var plan =
             await _plannerAiService
@@ -42,13 +48,13 @@ public class PlannerRuntime
                     planStep.ToolName);
 
             var parameters =
-                tool.GetDefaultParameters();
+                planStep.Parameters;
 
             var result =
                 await tool.ExecuteAsync(
                     parameters);
 
-            executionSteps.Add(
+            var executionStep =
                 new PlannerExecutionStepModel
                 {
                     StepNumber =
@@ -60,17 +66,30 @@ public class PlannerRuntime
                     Status = "Completed",
 
                     Result = result
-                });
+                };
+
+            _workflowStateService
+                .AddStepResult(
+                    state,
+                    executionStep);
+
+            _workflowStateService
+                .SetMemoryValue(
+                    state,
+                    planStep.ToolName,
+                    result);
         }
 
         return new PlannerExecutionResponseModel
         {
-            WorkflowId = workflowId,
+            WorkflowId =
+                state.WorkflowId,
 
             ExecutedAtUtc =
-                DateTime.UtcNow,
+                state.StartedAtUtc,
 
-            Steps = executionSteps
+            Steps =
+                state.Steps
         };
     }
 }

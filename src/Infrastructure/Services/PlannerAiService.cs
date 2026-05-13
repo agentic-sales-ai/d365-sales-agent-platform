@@ -42,7 +42,7 @@ public class PlannerAiService
             _toolRegistry
                 .GetTools()
                 .Select(t =>
-                    $"- {t.Name}: {t.Description}");
+    $"- Tool: {t.Name}\nDescription: {t.Description}");
 
         var toolsText =
             string.Join("\n", tools);
@@ -69,6 +69,9 @@ steps = array
 Each step must contain:
 - stepNumber
 - toolName
+- parameters
+
+Parameters must contain all required tool inputs.
 
 Only use available tools.
 Do not include explanations.
@@ -117,13 +120,18 @@ Do not include explanations.
                 .GetString();
 
         if (string.IsNullOrWhiteSpace(content))
-        {
-            return new PlannerPlanModel();
-        }
+{
+    return new PlannerPlanModel();
+}
 
-        var result =
-            JsonSerializer.Deserialize<PlannerPlanModel>(
-                content,
+content = content
+    .Replace("```json", "")
+    .Replace("```", "")
+    .Trim();
+
+var result =
+    JsonSerializer.Deserialize<PlannerPlanModel>(
+        content,
                 new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true

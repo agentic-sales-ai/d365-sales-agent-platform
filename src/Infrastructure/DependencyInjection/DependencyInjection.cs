@@ -58,6 +58,10 @@ public static class DependencyInjection
             IPlannerAiService,
             PlannerAiService>();
 
+        services.AddScoped<
+            IWorkflowStateService,
+            WorkflowStateService>();
+
         return services;
     }
 }

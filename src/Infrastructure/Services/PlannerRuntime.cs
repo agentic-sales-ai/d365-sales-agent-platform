@@ -42,17 +42,17 @@ public class PlannerRuntime
         _repository = repository;
     }
 
-    public async Task<PlannerExecutionResponseModel>
-        ExecutePlanAsync(string userPrompt)
+    public async Task ExecuteWorkflowAsync(
+        WorkflowExecutionStateModel state)
     {
-        var state =
-            _workflowStateService
-                .CreateState(userPrompt);
+        state.Status = "Running";
+
+        await _repository.SaveAsync(state);
 
         var plan =
             await _plannerAiService
                 .GeneratePlanAsync(
-                    userPrompt);
+                    state.UserPrompt);
 
         foreach (var planStep in plan.Steps)
         {
@@ -141,18 +141,8 @@ public class PlannerRuntime
             await _repository.SaveAsync(state);
         }
 
+        state.Status = "Completed";
+
         await _repository.SaveAsync(state);
-
-        return new PlannerExecutionResponseModel
-        {
-            WorkflowId =
-                state.WorkflowId,
-
-            ExecutedAtUtc =
-                state.StartedAtUtc,
-
-            Steps =
-                state.Steps
-        };
     }
 }

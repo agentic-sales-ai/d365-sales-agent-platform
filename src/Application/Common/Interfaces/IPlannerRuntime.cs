@@ -4,6 +4,6 @@ namespace Application.Common.Interfaces;
 
 public interface IPlannerRuntime
 {
-    Task<PlannerExecutionResponseModel>
-        ExecutePlanAsync(string userPrompt);
+    Task ExecuteWorkflowAsync(
+        WorkflowExecutionStateModel state);
 }

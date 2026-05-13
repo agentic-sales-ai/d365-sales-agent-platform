@@ -8,42 +8,49 @@ namespace Api.Controllers;
 [Route("api/[controller]")]
 public class PlannerController : ControllerBase
 {
-    private readonly IPlannerRuntime
-        _plannerRuntime;
+    private readonly IWorkflowStateService
+        _workflowStateService;
 
     private readonly IWorkflowStateRepository
         _repository;
 
+    private readonly IWorkflowExecutionQueue
+        _queue;
+
     public PlannerController(
-        IPlannerRuntime plannerRuntime,
-        IWorkflowStateRepository repository)
+        IWorkflowStateService workflowStateService,
+        IWorkflowStateRepository repository,
+        IWorkflowExecutionQueue queue)
     {
-        _plannerRuntime =
-            plannerRuntime;
+        _workflowStateService =
+            workflowStateService;
 
         _repository = repository;
+
+        _queue = queue;
     }
 
     [HttpPost("execute")]
     public async Task<IActionResult> Execute(
         AiToolExecutionRequestModel request)
     {
-        try
-        {
-            var result =
-                await _plannerRuntime
-                    .ExecutePlanAsync(
-                        request.UserPrompt);
+        var workflow =
+            _workflowStateService
+                .CreateState(
+                    request.UserPrompt);
 
-            return Ok(result);
-        }
-        catch (Exception ex)
+        await _repository
+            .SaveAsync(workflow);
+
+        _queue.Enqueue(
+            workflow.WorkflowId);
+
+        return Ok(new
         {
-            return BadRequest(new
-            {
-                Error = ex.Message
-            });
-        }
+            workflow.WorkflowId,
+
+            workflow.Status
+        });
     }
 
     [HttpGet("workflow/{workflowId}")]

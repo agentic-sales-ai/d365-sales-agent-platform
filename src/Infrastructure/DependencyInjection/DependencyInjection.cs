@@ -3,6 +3,7 @@ using Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Infrastructure.Tools;
 using Infrastructure.Repositories;
+using Infrastructure.Queues;
 
 namespace Infrastructure.DependencyInjection;
 
@@ -83,6 +84,13 @@ public static class DependencyInjection
             IWorkflowStateRepository,
             InMemoryWorkflowStateRepository>();
         
+        services.AddSingleton<
+            IWorkflowExecutionQueue,
+            InMemoryWorkflowExecutionQueue>();
+
+        services.AddHostedService<
+            WorkflowExecutionBackgroundService>();
+
         return services;
     }
 }

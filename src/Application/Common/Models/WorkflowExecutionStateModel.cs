@@ -7,6 +7,9 @@ public class WorkflowExecutionStateModel
     public string UserPrompt { get; set; }
         = string.Empty;
 
+    public string Status { get; set; }
+    = "Pending";
+    
     public DateTime StartedAtUtc
         { get; set; }
 

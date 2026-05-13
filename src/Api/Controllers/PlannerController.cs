@@ -18,27 +18,45 @@ public class PlannerController : ControllerBase
         _queue;
 
     private readonly IWorkflowTelemetryService
-    _telemetryService;
-    
+        _telemetryService;
+
+    private readonly IWorkflowApprovalRepository
+        _approvalRepository;
+
+    private readonly IPlannerRuntime
+        _plannerRuntime;
+
     public PlannerController(
         IWorkflowStateService workflowStateService,
         IWorkflowStateRepository repository,
         IWorkflowExecutionQueue queue,
-        IWorkflowTelemetryService telemetryService)
+        IWorkflowTelemetryService telemetryService,
+        IWorkflowApprovalRepository approvalRepository,
+        IPlannerRuntime plannerRuntime)
     {
         _workflowStateService =
             workflowStateService;
 
-        _repository = repository;
+        _repository =
+            repository;
 
-        _queue = queue;
+        _queue =
+            queue;
 
-        _telemetryService = telemetryService;
+        _telemetryService =
+            telemetryService;
+
+        _approvalRepository =
+            approvalRepository;
+
+        _plannerRuntime =
+            plannerRuntime;
     }
 
     [HttpPost("execute")]
-    public async Task<IActionResult> Execute(
-        AiToolExecutionRequestModel request)
+    public async Task<IActionResult>
+        Execute(
+            AiToolExecutionRequestModel request)
     {
         var workflow =
             _workflowStateService
@@ -77,7 +95,8 @@ public class PlannerController : ControllerBase
 
     [HttpGet("workflow/{workflowId}/events")]
     public async Task<IActionResult>
-        GetWorkflowEvents(Guid workflowId)
+        GetWorkflowEvents(
+            Guid workflowId)
     {
         var events =
             await _telemetryService
@@ -86,4 +105,90 @@ public class PlannerController : ControllerBase
         return Ok(events);
     }
 
+    [HttpPost(
+        "workflow/{workflowId}/approve")]
+    public async Task<IActionResult>
+        ApproveWorkflow(
+            Guid workflowId,
+            ResolveApprovalRequestModel request)
+    {
+        var workflow =
+            await _repository
+                .GetAsync(workflowId);
+
+        if (workflow == null)
+        {
+            return NotFound();
+        }
+
+        var pendingApproval =
+            await _approvalRepository
+                .GetPendingAsync(
+                    workflowId);
+
+        if (pendingApproval == null)
+        {
+            return BadRequest(
+                "No pending approval found.");
+        }
+
+        pendingApproval.Status =
+            request.Approved
+                ? "Approved"
+                : "Rejected";
+
+        pendingApproval.ResolvedAtUtc =
+            DateTime.UtcNow;
+
+        pendingApproval.DecisionNotes =
+            request.Notes;
+
+        await _approvalRepository
+            .UpdateAsync(
+                pendingApproval);
+
+        if (!request.Approved)
+        {
+            workflow.Status =
+                "Rejected";
+
+            await _repository
+                .SaveAsync(workflow);
+
+            return Ok(workflow);
+        }
+
+        workflow.Status =
+            "Running";
+
+        await _repository
+            .SaveAsync(workflow);
+
+        await _telemetryService
+            .TrackEventAsync(
+            new WorkflowExecutionEventModel
+            {
+                WorkflowId =
+                    workflow.WorkflowId,
+
+                TimestampUtc =
+                    DateTime.UtcNow,
+
+                EventType =
+                    "WorkflowResumed",
+
+                Message =
+                    "Workflow resumed after approval."
+            });
+
+        _queue.Enqueue(
+            workflow.WorkflowId);
+
+        return Ok(new
+        {
+            workflow.WorkflowId,
+
+            workflow.Status
+        });
+    }
 }

@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 
@@ -28,8 +27,8 @@ public class PlannerRuntime
     private readonly IResilientExecutionService
         _resilientExecutionService;
 
-    private readonly IServiceProvider
-    _serviceProvider;
+    private readonly IWorkflowApprovalRepository
+        _approvalRepository;
 
     public PlannerRuntime(
         IAgentToolRegistry toolRegistry,
@@ -40,7 +39,8 @@ public class PlannerRuntime
         IWorkflowTelemetryService telemetryService,
         IResilientExecutionService
             resilientExecutionService,
-        IServiceProvider serviceProvider)
+        IWorkflowApprovalRepository
+            approvalRepository)
     {
         _toolRegistry = toolRegistry;
 
@@ -53,7 +53,8 @@ public class PlannerRuntime
         _policyService =
             policyService;
 
-        _repository = repository;
+        _repository =
+            repository;
 
         _telemetryService =
             telemetryService;
@@ -61,8 +62,8 @@ public class PlannerRuntime
         _resilientExecutionService =
             resilientExecutionService;
 
-        _serviceProvider =
-            serviceProvider;
+        _approvalRepository =
+            approvalRepository;
     }
 
     public async Task ExecuteWorkflowAsync(
@@ -72,7 +73,8 @@ public class PlannerRuntime
         {
             state.Status = "Running";
 
-            await _repository.SaveAsync(state);
+            await _repository
+                .SaveAsync(state);
 
             await _telemetryService
                 .TrackEventAsync(
@@ -96,8 +98,18 @@ public class PlannerRuntime
                     .GeneratePlanAsync(
                         state.UserPrompt);
 
-            foreach (var planStep in plan.Steps)
+            foreach (var planStep
+                in plan.Steps
+                    .Where(s =>
+                        s.StepNumber >=
+                        state.CurrentStepNumber))
             {
+                state.CurrentStepNumber =
+                    planStep.StepNumber;
+
+                await _repository
+                    .SaveAsync(state);
+
                 await _telemetryService
                     .TrackEventAsync(
                     new WorkflowExecutionEventModel
@@ -123,116 +135,138 @@ public class PlannerRuntime
                         .ValidateAsync(planStep);
 
                 if (!policyResult.IsAllowed)
-{
-    if (policyResult.Reason
-        .Contains("Approval required"))
+                {
+                    var existingApproval =
+                        await _approvalRepository
+                            .GetApprovedAsync(
+                                state.WorkflowId,
+                                planStep.ToolName);
+
+                    if (existingApproval != null)
+                    {
+                        policyResult =
+                            new ExecutionPolicyResultModel
+                            {
+                                IsAllowed = true,
+
+                                Reason =
+                                    "Previously approved."
+                            };
+                    }
+                    else if (policyResult.Reason
+                        .Contains(
+                            "Approval required"))
+                    {
+                        var approval =
+    new WorkflowApprovalModel
     {
-        var approval =
-            new WorkflowApprovalModel
-            {
-                ApprovalId =
-                    Guid.NewGuid(),
+        ApprovalId =
+            Guid.NewGuid(),
 
-                WorkflowId =
-                    state.WorkflowId,
+        WorkflowId =
+            state.WorkflowId,
 
-                ToolName =
-                    planStep.ToolName,
+        ToolName =
+            planStep.ToolName,
 
-                CreatedAtUtc =
-                    DateTime.UtcNow
-            };
+        Status =
+            "Pending",
 
-        var approvalRepository =
-            _serviceProvider
-                .GetRequiredService<
-                    IWorkflowApprovalRepository>();
+        CreatedAtUtc =
+            DateTime.UtcNow
+    };
 
-        await approvalRepository
-            .CreateAsync(approval);
+                        await _approvalRepository
+                            .CreateAsync(
+                                approval);
 
-        state.Status =
-            "WaitingForApproval";
+                        state.Status =
+                            "WaitingForApproval";
 
-        await _repository
-            .SaveAsync(state);
+                        await _repository
+                            .SaveAsync(state);
 
-        await _telemetryService
-            .TrackEventAsync(
-            new WorkflowExecutionEventModel
-            {
-                WorkflowId =
-                    state.WorkflowId,
+                        await _telemetryService
+                            .TrackEventAsync(
+                            new WorkflowExecutionEventModel
+                            {
+                                WorkflowId =
+                                    state.WorkflowId,
 
-                TimestampUtc =
-                    DateTime.UtcNow,
+                                TimestampUtc =
+                                    DateTime.UtcNow,
 
-                EventType =
-                    "WorkflowSuspended",
+                                EventType =
+                                    "WorkflowSuspended",
 
-                ToolName =
-                    planStep.ToolName,
+                                ToolName =
+                                    planStep.ToolName,
 
-                Message =
-                    $"Approval required for {planStep.ToolName}"
-            });
+                                Message =
+                                    $"Approval required for {planStep.ToolName}"
+                            });
 
-        return;
-    }
+                        return;
+                    }
+                    else
+                    {
+                        var blockedStep =
+                            new PlannerExecutionStepModel
+                            {
+                                StepNumber =
+                                    planStep.StepNumber,
 
-    var blockedStep =
-        new PlannerExecutionStepModel
-        {
-            StepNumber =
-                planStep.StepNumber,
+                                ToolName =
+                                    planStep.ToolName,
 
-            ToolName =
-                planStep.ToolName,
+                                Status =
+                                    "Blocked",
 
-            Status = "Blocked",
+                                Result =
+                                    policyResult.Reason
+                            };
 
-            Result =
-                policyResult.Reason
-        };
+                        _workflowStateService
+                            .AddStepResult(
+                                state,
+                                blockedStep);
 
-    _workflowStateService
-        .AddStepResult(
-            state,
-            blockedStep);
+                        await _telemetryService
+                            .TrackEventAsync(
+                            new WorkflowExecutionEventModel
+                            {
+                                WorkflowId =
+                                    state.WorkflowId,
 
-    await _telemetryService
-        .TrackEventAsync(
-        new WorkflowExecutionEventModel
-        {
-            WorkflowId =
-                state.WorkflowId,
+                                TimestampUtc =
+                                    DateTime.UtcNow,
 
-            TimestampUtc =
-                DateTime.UtcNow,
+                                EventType =
+                                    "StepBlocked",
 
-            EventType =
-                "StepBlocked",
+                                ToolName =
+                                    planStep.ToolName,
 
-            ToolName =
-                planStep.ToolName,
+                                Message =
+                                    policyResult.Reason
+                            });
 
-            Message =
-                policyResult.Reason
-        });
-
-    continue;
-}
+                        continue;
+                    }
+                }
 
                 var tool =
-                    _toolRegistry.GetTool(
-                        planStep.ToolName);
+                    _toolRegistry
+                        .GetTool(
+                            planStep.ToolName);
 
                 var parameters =
                     new Dictionary<string, object>(
                         planStep.Parameters);
 
                 foreach (var memoryKey
-                    in planStep.DependsOnMemoryKeys)
+                    in planStep
+                        .DependsOnMemoryKeys)
                 {
                     var memoryValue =
                         _workflowStateService
@@ -270,7 +304,8 @@ public class PlannerRuntime
                             ToolName =
                                 planStep.ToolName,
 
-                            Status = "Completed",
+                            Status =
+                                "Completed",
 
                             Result = result
                         };
@@ -320,7 +355,8 @@ public class PlannerRuntime
                             ToolName =
                                 planStep.ToolName,
 
-                            Status = "Failed",
+                            Status =
+                                "Failed",
 
                             Result =
                                 ex.Message
@@ -360,7 +396,8 @@ public class PlannerRuntime
 
             state.Status = "Completed";
 
-            await _repository.SaveAsync(state);
+            await _repository
+                .SaveAsync(state);
 
             await _telemetryService
                 .TrackEventAsync(
@@ -386,7 +423,8 @@ public class PlannerRuntime
             state.FailureReason =
                 ex.Message;
 
-            await _repository.SaveAsync(state);
+            await _repository
+                .SaveAsync(state);
 
             await _telemetryService
                 .TrackEventAsync(

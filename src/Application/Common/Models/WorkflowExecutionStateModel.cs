@@ -13,6 +13,9 @@ public class WorkflowExecutionStateModel
     public string? FailureReason
     { get; set; }
     
+    public int CurrentStepNumber
+    { get; set; }
+    
     public DateTime StartedAtUtc
         { get; set; }
 

@@ -12,4 +12,13 @@ public interface IWorkflowApprovalRepository
 
     Task UpdateAsync(
         WorkflowApprovalModel approval);
+
+    Task<WorkflowApprovalModel?>
+        GetApprovedAsync(
+            Guid workflowId,
+            string toolName);
+
+    Task<WorkflowApprovalModel?>
+        GetPendingAsync(
+            Guid workflowId);
 }

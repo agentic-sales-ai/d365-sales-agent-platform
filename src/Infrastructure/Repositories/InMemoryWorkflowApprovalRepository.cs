@@ -38,4 +38,37 @@ public class InMemoryWorkflowApprovalRepository
 
         return Task.CompletedTask;
     }
+
+    public Task<WorkflowApprovalModel?>
+        GetApprovedAsync(
+            Guid workflowId,
+            string toolName)
+    {
+        var approval =
+            _storage.Values
+                .FirstOrDefault(a =>
+                    a.WorkflowId ==
+                        workflowId
+                    && a.ToolName ==
+                        toolName
+                    && a.Status ==
+                        "Approved");
+
+        return Task.FromResult(approval);
+    }
+
+    public Task<WorkflowApprovalModel?>
+    GetPendingAsync(
+        Guid workflowId)
+{
+    var approval =
+        _storage.Values
+            .FirstOrDefault(a =>
+                a.WorkflowId ==
+                    workflowId
+                && a.Status ==
+                    "Pending");
+
+    return Task.FromResult(approval);
+}
 }

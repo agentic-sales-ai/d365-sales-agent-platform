@@ -91,6 +91,10 @@ public static class DependencyInjection
         services.AddHostedService<
             WorkflowExecutionBackgroundService>();
 
+        services.AddSingleton<
+            IWorkflowTelemetryService,
+            WorkflowTelemetryService>();
+
         return services;
     }
 }

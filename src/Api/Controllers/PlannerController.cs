@@ -17,10 +17,14 @@ public class PlannerController : ControllerBase
     private readonly IWorkflowExecutionQueue
         _queue;
 
+    private readonly IWorkflowTelemetryService
+    _telemetryService;
+    
     public PlannerController(
         IWorkflowStateService workflowStateService,
         IWorkflowStateRepository repository,
-        IWorkflowExecutionQueue queue)
+        IWorkflowExecutionQueue queue,
+        IWorkflowTelemetryService telemetryService)
     {
         _workflowStateService =
             workflowStateService;
@@ -28,6 +32,8 @@ public class PlannerController : ControllerBase
         _repository = repository;
 
         _queue = queue;
+
+        _telemetryService = telemetryService;
     }
 
     [HttpPost("execute")]
@@ -68,4 +74,16 @@ public class PlannerController : ControllerBase
 
         return Ok(workflow);
     }
+
+    [HttpGet("workflow/{workflowId}/events")]
+    public async Task<IActionResult>
+        GetWorkflowEvents(Guid workflowId)
+    {
+        var events =
+            await _telemetryService
+                .GetEventsAsync(workflowId);
+
+        return Ok(events);
+    }
+
 }

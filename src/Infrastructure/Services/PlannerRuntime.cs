@@ -21,12 +21,16 @@ public class PlannerRuntime
     private readonly IWorkflowStateRepository
         _repository;
 
+    private readonly IWorkflowTelemetryService
+        _telemetryService;
+
     public PlannerRuntime(
         IAgentToolRegistry toolRegistry,
         IPlannerAiService plannerAiService,
         IWorkflowStateService workflowStateService,
         IExecutionPolicyService policyService,
-        IWorkflowStateRepository repository)
+        IWorkflowStateRepository repository,
+        IWorkflowTelemetryService telemetryService)
     {
         _toolRegistry = toolRegistry;
 
@@ -40,6 +44,9 @@ public class PlannerRuntime
             policyService;
 
         _repository = repository;
+
+        _telemetryService =
+            telemetryService;
     }
 
     public async Task ExecuteWorkflowAsync(
@@ -49,6 +56,22 @@ public class PlannerRuntime
 
         await _repository.SaveAsync(state);
 
+        await _telemetryService.TrackEventAsync(
+            new WorkflowExecutionEventModel
+            {
+                WorkflowId =
+                    state.WorkflowId,
+
+                TimestampUtc =
+                    DateTime.UtcNow,
+
+                EventType =
+                    "WorkflowStarted",
+
+                Message =
+                    "Workflow execution started."
+            });
+
         var plan =
             await _plannerAiService
                 .GeneratePlanAsync(
@@ -56,6 +79,25 @@ public class PlannerRuntime
 
         foreach (var planStep in plan.Steps)
         {
+            await _telemetryService.TrackEventAsync(
+                new WorkflowExecutionEventModel
+                {
+                    WorkflowId =
+                        state.WorkflowId,
+
+                    TimestampUtc =
+                        DateTime.UtcNow,
+
+                    EventType =
+                        "StepStarted",
+
+                    ToolName =
+                        planStep.ToolName,
+
+                    Message =
+                        $"Executing {planStep.ToolName}"
+                });
+
             var policyResult =
                 await _policyService
                     .ValidateAsync(planStep);
@@ -81,6 +123,26 @@ public class PlannerRuntime
                     .AddStepResult(
                         state,
                         blockedStep);
+
+                await _telemetryService
+                    .TrackEventAsync(
+                    new WorkflowExecutionEventModel
+                    {
+                        WorkflowId =
+                            state.WorkflowId,
+
+                        TimestampUtc =
+                            DateTime.UtcNow,
+
+                        EventType =
+                            "StepBlocked",
+
+                        ToolName =
+                            planStep.ToolName,
+
+                        Message =
+                            policyResult.Reason
+                    });
 
                 continue;
             }
@@ -139,10 +201,46 @@ public class PlannerRuntime
                     result);
 
             await _repository.SaveAsync(state);
+
+            await _telemetryService
+                .TrackEventAsync(
+                new WorkflowExecutionEventModel
+                {
+                    WorkflowId =
+                        state.WorkflowId,
+
+                    TimestampUtc =
+                        DateTime.UtcNow,
+
+                    EventType =
+                        "StepCompleted",
+
+                    ToolName =
+                        planStep.ToolName,
+
+                    Message =
+                        $"{planStep.ToolName} completed successfully."
+                });
         }
 
         state.Status = "Completed";
 
         await _repository.SaveAsync(state);
+
+        await _telemetryService.TrackEventAsync(
+            new WorkflowExecutionEventModel
+            {
+                WorkflowId =
+                    state.WorkflowId,
+
+                TimestampUtc =
+                    DateTime.UtcNow,
+
+                EventType =
+                    "WorkflowCompleted",
+
+                Message =
+                    "Workflow execution completed."
+            });
     }
 }

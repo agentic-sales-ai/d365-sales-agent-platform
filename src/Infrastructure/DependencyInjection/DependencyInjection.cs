@@ -95,6 +95,10 @@ public static class DependencyInjection
             IWorkflowTelemetryService,
             WorkflowTelemetryService>();
 
+        services.AddScoped<
+            IResilientExecutionService,
+            ResilientExecutionService>();
+
         return services;
     }
 }

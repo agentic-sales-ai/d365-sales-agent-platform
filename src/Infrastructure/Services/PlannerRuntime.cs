@@ -24,13 +24,18 @@ public class PlannerRuntime
     private readonly IWorkflowTelemetryService
         _telemetryService;
 
+    private readonly IResilientExecutionService
+        _resilientExecutionService;
+
     public PlannerRuntime(
         IAgentToolRegistry toolRegistry,
         IPlannerAiService plannerAiService,
         IWorkflowStateService workflowStateService,
         IExecutionPolicyService policyService,
         IWorkflowStateRepository repository,
-        IWorkflowTelemetryService telemetryService)
+        IWorkflowTelemetryService telemetryService,
+        IResilientExecutionService
+            resilientExecutionService)
     {
         _toolRegistry = toolRegistry;
 
@@ -47,158 +52,17 @@ public class PlannerRuntime
 
         _telemetryService =
             telemetryService;
+
+        _resilientExecutionService =
+            resilientExecutionService;
     }
 
     public async Task ExecuteWorkflowAsync(
         WorkflowExecutionStateModel state)
     {
-        state.Status = "Running";
-
-        await _repository.SaveAsync(state);
-
-        await _telemetryService.TrackEventAsync(
-            new WorkflowExecutionEventModel
-            {
-                WorkflowId =
-                    state.WorkflowId,
-
-                TimestampUtc =
-                    DateTime.UtcNow,
-
-                EventType =
-                    "WorkflowStarted",
-
-                Message =
-                    "Workflow execution started."
-            });
-
-        var plan =
-            await _plannerAiService
-                .GeneratePlanAsync(
-                    state.UserPrompt);
-
-        foreach (var planStep in plan.Steps)
+        try
         {
-            await _telemetryService.TrackEventAsync(
-                new WorkflowExecutionEventModel
-                {
-                    WorkflowId =
-                        state.WorkflowId,
-
-                    TimestampUtc =
-                        DateTime.UtcNow,
-
-                    EventType =
-                        "StepStarted",
-
-                    ToolName =
-                        planStep.ToolName,
-
-                    Message =
-                        $"Executing {planStep.ToolName}"
-                });
-
-            var policyResult =
-                await _policyService
-                    .ValidateAsync(planStep);
-
-            if (!policyResult.IsAllowed)
-            {
-                var blockedStep =
-                    new PlannerExecutionStepModel
-                    {
-                        StepNumber =
-                            planStep.StepNumber,
-
-                        ToolName =
-                            planStep.ToolName,
-
-                        Status = "Blocked",
-
-                        Result =
-                            policyResult.Reason
-                    };
-
-                _workflowStateService
-                    .AddStepResult(
-                        state,
-                        blockedStep);
-
-                await _telemetryService
-                    .TrackEventAsync(
-                    new WorkflowExecutionEventModel
-                    {
-                        WorkflowId =
-                            state.WorkflowId,
-
-                        TimestampUtc =
-                            DateTime.UtcNow,
-
-                        EventType =
-                            "StepBlocked",
-
-                        ToolName =
-                            planStep.ToolName,
-
-                        Message =
-                            policyResult.Reason
-                    });
-
-                continue;
-            }
-
-            var tool =
-                _toolRegistry.GetTool(
-                    planStep.ToolName);
-
-            var parameters =
-                new Dictionary<string, object>(
-                    planStep.Parameters);
-
-            foreach (var memoryKey
-                in planStep.DependsOnMemoryKeys)
-            {
-                var memoryValue =
-                    _workflowStateService
-                        .GetMemoryValue(
-                            state,
-                            memoryKey);
-
-                if (memoryValue != null)
-                {
-                    parameters[memoryKey] =
-                        memoryValue;
-                }
-            }
-
-            var result =
-                await tool.ExecuteAsync(
-                    parameters);
-
-            var executionStep =
-                new PlannerExecutionStepModel
-                {
-                    StepNumber =
-                        planStep.StepNumber,
-
-                    ToolName =
-                        planStep.ToolName,
-
-                    Status = "Completed",
-
-                    Result = result
-                };
-
-            _workflowStateService
-                .AddStepResult(
-                    state,
-                    executionStep);
-
-            _workflowStateService
-                .SetMemoryValue(
-                    state,
-                    planStep.ToolName,
-                    result);
+            state.Status = "Running";
 
             await _repository.SaveAsync(state);
 
@@ -213,34 +77,269 @@ public class PlannerRuntime
                         DateTime.UtcNow,
 
                     EventType =
-                        "StepCompleted",
-
-                    ToolName =
-                        planStep.ToolName,
+                        "WorkflowStarted",
 
                     Message =
-                        $"{planStep.ToolName} completed successfully."
+                        "Workflow execution started."
+                });
+
+            var plan =
+                await _plannerAiService
+                    .GeneratePlanAsync(
+                        state.UserPrompt);
+
+            foreach (var planStep in plan.Steps)
+            {
+                await _telemetryService
+                    .TrackEventAsync(
+                    new WorkflowExecutionEventModel
+                    {
+                        WorkflowId =
+                            state.WorkflowId,
+
+                        TimestampUtc =
+                            DateTime.UtcNow,
+
+                        EventType =
+                            "StepStarted",
+
+                        ToolName =
+                            planStep.ToolName,
+
+                        Message =
+                            $"Executing {planStep.ToolName}"
+                    });
+
+                var policyResult =
+                    await _policyService
+                        .ValidateAsync(planStep);
+
+                if (!policyResult.IsAllowed)
+                {
+                    var blockedStep =
+                        new PlannerExecutionStepModel
+                        {
+                            StepNumber =
+                                planStep.StepNumber,
+
+                            ToolName =
+                                planStep.ToolName,
+
+                            Status = "Blocked",
+
+                            Result =
+                                policyResult.Reason
+                        };
+
+                    _workflowStateService
+                        .AddStepResult(
+                            state,
+                            blockedStep);
+
+                    await _telemetryService
+                        .TrackEventAsync(
+                        new WorkflowExecutionEventModel
+                        {
+                            WorkflowId =
+                                state.WorkflowId,
+
+                            TimestampUtc =
+                                DateTime.UtcNow,
+
+                            EventType =
+                                "StepBlocked",
+
+                            ToolName =
+                                planStep.ToolName,
+
+                            Message =
+                                policyResult.Reason
+                        });
+
+                    continue;
+                }
+
+                var tool =
+                    _toolRegistry.GetTool(
+                        planStep.ToolName);
+
+                var parameters =
+                    new Dictionary<string, object>(
+                        planStep.Parameters);
+
+                foreach (var memoryKey
+                    in planStep.DependsOnMemoryKeys)
+                {
+                    var memoryValue =
+                        _workflowStateService
+                            .GetMemoryValue(
+                                state,
+                                memoryKey);
+
+                    if (memoryValue != null)
+                    {
+                        parameters[memoryKey] =
+                            memoryValue;
+                    }
+                }
+
+                try
+                {
+                    var result =
+                        await _resilientExecutionService
+                            .ExecuteAsync(
+                            async () =>
+                            {
+                                return await tool
+                                    .ExecuteAsync(
+                                        parameters);
+                            },
+                            planStep.ToolName,
+                            state.WorkflowId);
+
+                    var executionStep =
+                        new PlannerExecutionStepModel
+                        {
+                            StepNumber =
+                                planStep.StepNumber,
+
+                            ToolName =
+                                planStep.ToolName,
+
+                            Status = "Completed",
+
+                            Result = result
+                        };
+
+                    _workflowStateService
+                        .AddStepResult(
+                            state,
+                            executionStep);
+
+                    _workflowStateService
+                        .SetMemoryValue(
+                            state,
+                            planStep.ToolName,
+                            result);
+
+                    await _repository
+                        .SaveAsync(state);
+
+                    await _telemetryService
+                        .TrackEventAsync(
+                        new WorkflowExecutionEventModel
+                        {
+                            WorkflowId =
+                                state.WorkflowId,
+
+                            TimestampUtc =
+                                DateTime.UtcNow,
+
+                            EventType =
+                                "StepCompleted",
+
+                            ToolName =
+                                planStep.ToolName,
+
+                            Message =
+                                $"{planStep.ToolName} completed successfully."
+                        });
+                }
+                catch (Exception ex)
+                {
+                    var failedStep =
+                        new PlannerExecutionStepModel
+                        {
+                            StepNumber =
+                                planStep.StepNumber,
+
+                            ToolName =
+                                planStep.ToolName,
+
+                            Status = "Failed",
+
+                            Result =
+                                ex.Message
+                        };
+
+                    _workflowStateService
+                        .AddStepResult(
+                            state,
+                            failedStep);
+
+                    await _repository
+                        .SaveAsync(state);
+
+                    await _telemetryService
+                        .TrackEventAsync(
+                        new WorkflowExecutionEventModel
+                        {
+                            WorkflowId =
+                                state.WorkflowId,
+
+                            TimestampUtc =
+                                DateTime.UtcNow,
+
+                            EventType =
+                                "StepFailed",
+
+                            ToolName =
+                                planStep.ToolName,
+
+                            Message =
+                                ex.Message
+                        });
+
+                    throw;
+                }
+            }
+
+            state.Status = "Completed";
+
+            await _repository.SaveAsync(state);
+
+            await _telemetryService
+                .TrackEventAsync(
+                new WorkflowExecutionEventModel
+                {
+                    WorkflowId =
+                        state.WorkflowId,
+
+                    TimestampUtc =
+                        DateTime.UtcNow,
+
+                    EventType =
+                        "WorkflowCompleted",
+
+                    Message =
+                        "Workflow execution completed."
                 });
         }
+        catch (Exception ex)
+        {
+            state.Status = "Failed";
 
-        state.Status = "Completed";
+            state.FailureReason =
+                ex.Message;
 
-        await _repository.SaveAsync(state);
+            await _repository.SaveAsync(state);
 
-        await _telemetryService.TrackEventAsync(
-            new WorkflowExecutionEventModel
-            {
-                WorkflowId =
-                    state.WorkflowId,
+            await _telemetryService
+                .TrackEventAsync(
+                new WorkflowExecutionEventModel
+                {
+                    WorkflowId =
+                        state.WorkflowId,
 
-                TimestampUtc =
-                    DateTime.UtcNow,
+                    TimestampUtc =
+                        DateTime.UtcNow,
 
-                EventType =
-                    "WorkflowCompleted",
+                    EventType =
+                        "WorkflowFailed",
 
-                Message =
-                    "Workflow execution completed."
-            });
+                    Message =
+                        ex.Message
+                });
+        }
     }
 }

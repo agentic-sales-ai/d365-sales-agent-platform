@@ -9,6 +9,9 @@ public class WorkflowExecutionStateModel
 
     public string Status { get; set; }
     = "Pending";
+
+    public string? FailureReason
+    { get; set; }
     
     public DateTime StartedAtUtc
         { get; set; }

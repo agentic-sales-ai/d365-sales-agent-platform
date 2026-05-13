@@ -6,19 +6,20 @@ public class GenerateFollowUpEmailTool
     : IAgentTool
 {
     private readonly IFollowUpEmailService
-        _emailService;
+        _followUpEmailService;
 
     public GenerateFollowUpEmailTool(
-        IFollowUpEmailService emailService)
+        IFollowUpEmailService followUpEmailService)
     {
-        _emailService = emailService;
+        _followUpEmailService =
+            followUpEmailService;
     }
 
     public string Name =>
         "GenerateFollowUpEmail";
 
     public string Description =>
-        "Generates AI follow-up email for opportunity.";
+        "Generates AI follow-up email for an opportunity.";
 
     public Dictionary<string, object>
         GetDefaultParameters()
@@ -30,19 +31,36 @@ public class GenerateFollowUpEmailTool
         Dictionary<string, object> parameters)
     {
         if (!parameters.ContainsKey(
-                "opportunityId"))
+                "Opportunity"))
         {
             throw new Exception(
-                "Missing opportunityId");
+                "Missing Opportunity");
+        }
+
+        var opportunity =
+            parameters["Opportunity"];
+
+        var idProperty =
+            opportunity
+                .GetType()
+                .GetProperty(
+                    "Id");
+
+        if (idProperty == null)
+        {
+            throw new Exception(
+                "Id missing");
         }
 
         var opportunityId =
             Guid.Parse(
-                parameters["opportunityId"]
+                idProperty
+                    .GetValue(
+                        opportunity)!
                     .ToString()!);
 
         var result =
-            await _emailService
+            await _followUpEmailService
                 .GenerateAsync(
                     opportunityId);
 

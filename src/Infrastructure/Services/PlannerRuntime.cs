@@ -315,11 +315,23 @@ public class PlannerRuntime
                             state,
                             executionStep);
 
-                    _workflowStateService
-                        .SetMemoryValue(
-                            state,
-                            planStep.ToolName,
-                            result);
+                    if (planStep.ToolName ==
+    "GetOpportunity")
+{
+    _workflowStateService
+        .SetMemoryValue(
+            state,
+            "Opportunity",
+            result);
+}
+else
+{
+    _workflowStateService
+        .SetMemoryValue(
+            state,
+            planStep.ToolName,
+            result);
+}
 
                     await _repository
                         .SaveAsync(state);

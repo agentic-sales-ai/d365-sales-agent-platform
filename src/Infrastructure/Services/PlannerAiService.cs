@@ -43,15 +43,20 @@ public class PlannerAiService
                 .GetTools()
                 .Select(t =>
 $"""
-- Tool: {t.Name}
-Description: {t.Description}
+Tool: {t.Name}
 
-Required Parameters:
-- opportunityId (Guid for Dynamics 365 opportunity)
+Description:
+{t.Description}
+
+DefaultParameters:
+{JsonSerializer.Serialize(
+    t.GetDefaultParameters())}
 """);
 
         var toolsText =
-            string.Join("\n", tools);
+            string.Join(
+                "\n",
+                tools);
 
         var prompt =
 $"""
@@ -69,48 +74,94 @@ Generate a workflow execution plan.
 
 Return ONLY valid JSON.
 
-Required JSON structure:
+Required structure:
+
 steps = array
 
-Each step must contain:
+Each step contains:
+
 - stepNumber
 - toolName
 - parameters
 - dependsOnMemoryKeys
 
-Parameters must contain all required tool inputs.
-
-For opportunity-related tools:
-- opportunityId is mandatory
-
-Always include opportunityId when working with opportunities.
+Rules:
 
 Only use available tools.
+
+Do not invent tools.
+
+Use tool descriptions.
+
+If a tool consumes output
+from a previous tool:
+
+NEVER place memory data
+inside parameters.
+
+Instead use:
+
+dependsOnMemoryKeys
+
+Example:
+
+GetOpportunity
+
+produces:
+
+Opportunity
+
+GenerateOpportunityInsights
+must contain:
+
+dependsOnMemoryKeys:
+
+[
+   "Opportunity"
+]
+
+Parameters stay empty
+for memory-driven tools.
+
+Never duplicate memory values
+inside parameters.
+
 Do not include explanations.
+
+Return JSON only.
 """;
 
-        var requestBody = new
-        {
-            model = _options.Model,
-            messages = new[]
+        var requestBody =
+            new
             {
-                new
-                {
-                    role = "user",
-                    content = prompt
-                }
-            }
-        };
+                model =
+                    _options.Model,
+
+                messages =
+                    new[]
+                    {
+                        new
+                        {
+                            role =
+                                "user",
+
+                            content =
+                                prompt
+                        }
+                    }
+            };
 
         var response =
-            await _httpClient.PostAsJsonAsync(
-                "https://api.openai.com/v1/chat/completions",
-                requestBody);
+            await _httpClient
+                .PostAsJsonAsync(
+                    "https://api.openai.com/v1/chat/completions",
+                    requestBody);
 
         if (!response.IsSuccessStatusCode)
         {
             var error =
-                await response.Content
+                await response
+                    .Content
                     .ReadAsStringAsync();
 
             throw new Exception(
@@ -118,37 +169,62 @@ Do not include explanations.
         }
 
         var json =
-            await response.Content
+            await response
+                .Content
                 .ReadAsStringAsync();
 
         using var document =
-            JsonDocument.Parse(json);
+            JsonDocument.Parse(
+                json);
 
         var content =
             document.RootElement
-                .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
+                .GetProperty(
+                    "choices")[0]
+                .GetProperty(
+                    "message")
+                .GetProperty(
+                    "content")
                 .GetString();
 
-        if (string.IsNullOrWhiteSpace(content))
-{
-    return new PlannerPlanModel();
-}
+        if (
+            string.IsNullOrWhiteSpace(
+                content))
+        {
+            return new PlannerPlanModel();
+        }
 
-content = content
-    .Replace("```json", "")
-    .Replace("```", "")
-    .Trim();
+        content =
+            content
+                .Replace(
+                    "```json",
+                    "")
+                .Replace(
+                    "```",
+                    "")
+                .Trim();
 
-var result =
-    JsonSerializer.Deserialize<PlannerPlanModel>(
-        content,
-                new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+        Console.WriteLine(
+@"===== GENERATED PLAN =====");
 
-        return result ?? new PlannerPlanModel();
+        Console.WriteLine(
+            content);
+
+        Console.WriteLine(
+@"==========================");
+
+        var result =
+            JsonSerializer
+                .Deserialize<
+                    PlannerPlanModel>(
+                    content,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive =
+                            true
+                    });
+
+        return result
+            ?? new PlannerPlanModel();
     }
 }

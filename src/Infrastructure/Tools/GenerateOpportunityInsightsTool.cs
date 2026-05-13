@@ -31,15 +31,32 @@ public class GenerateOpportunityInsightsTool
         Dictionary<string, object> parameters)
     {
         if (!parameters.ContainsKey(
-                "opportunityId"))
+                "Opportunity"))
         {
             throw new Exception(
-                "Missing opportunityId");
+                "Missing Opportunity");
+        }
+
+        var opportunity =
+            parameters["Opportunity"];
+
+        var idProperty =
+            opportunity
+                .GetType()
+                .GetProperty(
+                    "Id");
+
+        if (idProperty == null)
+        {
+            throw new Exception(
+                "Id missing");
         }
 
         var opportunityId =
             Guid.Parse(
-                parameters["opportunityId"]
+                idProperty
+                    .GetValue(
+                        opportunity)!
                     .ToString()!);
 
         var result =

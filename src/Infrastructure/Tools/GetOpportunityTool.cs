@@ -11,23 +11,24 @@ public class GetOpportunityTool
     public GetOpportunityTool(
         IDataverseService dataverseService)
     {
-        _dataverseService = dataverseService;
+        _dataverseService =
+            dataverseService;
     }
 
     public string Name =>
         "GetOpportunity";
 
     public string Description =>
-        "Retrieves an opportunity from Dynamics 365 Sales.";
+        "Gets opportunity details from Dynamics 365.";
 
     public Dictionary<string, object>
         GetDefaultParameters()
     {
-        return new Dictionary<string, object>
+        return new()
         {
             {
                 "opportunityId",
-                "a09c2889-a016-eb11-a813-002248029f77"
+                "Guid"
             }
         };
     }
@@ -47,11 +48,11 @@ public class GetOpportunityTool
                 parameters["opportunityId"]
                     .ToString()!);
 
-        var result =
+        var opportunity =
             await _dataverseService
                 .GetOpportunityAsync(
                     opportunityId);
 
-        return result!;
+        return opportunity;
     }
 }

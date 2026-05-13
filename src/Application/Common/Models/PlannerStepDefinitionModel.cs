@@ -9,4 +9,7 @@ public class PlannerStepDefinitionModel
 
     public Dictionary<string, object>
         Parameters { get; set; } = [];
+
+    public List<string>
+        DependsOnMemoryKeys { get; set; } = [];
 }

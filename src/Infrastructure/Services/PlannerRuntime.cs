@@ -48,7 +48,24 @@ public class PlannerRuntime
                     planStep.ToolName);
 
             var parameters =
-                planStep.Parameters;
+                new Dictionary<string, object>(
+                    planStep.Parameters);
+
+            foreach (var memoryKey
+                in planStep.DependsOnMemoryKeys)
+            {
+                var memoryValue =
+                    _workflowStateService
+                        .GetMemoryValue(
+                            state,
+                            memoryKey);
+
+                if (memoryValue != null)
+                {
+                    parameters[memoryKey] =
+                        memoryValue;
+                }
+            }
 
             var result =
                 await tool.ExecuteAsync(

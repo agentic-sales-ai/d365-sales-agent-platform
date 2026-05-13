@@ -42,7 +42,13 @@ public class PlannerAiService
             _toolRegistry
                 .GetTools()
                 .Select(t =>
-    $"- Tool: {t.Name}\nDescription: {t.Description}");
+$"""
+- Tool: {t.Name}
+Description: {t.Description}
+
+Required Parameters:
+- opportunityId (Guid for Dynamics 365 opportunity)
+""");
 
         var toolsText =
             string.Join("\n", tools);
@@ -70,8 +76,14 @@ Each step must contain:
 - stepNumber
 - toolName
 - parameters
+- dependsOnMemoryKeys
 
 Parameters must contain all required tool inputs.
+
+For opportunity-related tools:
+- opportunityId is mandatory
+
+Always include opportunityId when working with opportunities.
 
 Only use available tools.
 Do not include explanations.

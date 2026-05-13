@@ -62,6 +62,18 @@ public static class DependencyInjection
             IWorkflowStateService,
             WorkflowStateService>();
 
+        services.AddScoped<
+            IAgentTool,
+            GenerateOpportunityInsightsTool>();
+
+        services.AddScoped<
+            IAgentTool,
+            AssessOpportunityRiskTool>();
+
+        services.AddScoped<
+            IAgentTool,
+            GenerateFollowUpEmailTool>();
+
         return services;
     }
 }

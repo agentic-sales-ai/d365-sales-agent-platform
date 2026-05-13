@@ -99,6 +99,10 @@ public static class DependencyInjection
             IResilientExecutionService,
             ResilientExecutionService>();
 
+        services.AddSingleton<
+            IWorkflowApprovalRepository,
+            InMemoryWorkflowApprovalRepository>();
+
         return services;
     }
 }

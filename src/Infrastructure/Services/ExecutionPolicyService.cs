@@ -43,6 +43,25 @@ public class ExecutionPolicyService
                 });
         }
 
+        var approvalRequiredTools =
+            new List<string>
+            {
+                "GenerateFollowUpEmail"
+            };
+
+        if (approvalRequiredTools
+            .Contains(step.ToolName))
+        {
+            return Task.FromResult(
+                new ExecutionPolicyResultModel
+                {
+                    IsAllowed = false,
+
+                    Reason =
+                        $"Approval required for {step.ToolName}."
+                });
+        }
+
         return Task.FromResult(
             new ExecutionPolicyResultModel
             {

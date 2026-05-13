@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 
@@ -27,6 +28,9 @@ public class PlannerRuntime
     private readonly IResilientExecutionService
         _resilientExecutionService;
 
+    private readonly IServiceProvider
+    _serviceProvider;
+
     public PlannerRuntime(
         IAgentToolRegistry toolRegistry,
         IPlannerAiService plannerAiService,
@@ -35,7 +39,8 @@ public class PlannerRuntime
         IWorkflowStateRepository repository,
         IWorkflowTelemetryService telemetryService,
         IResilientExecutionService
-            resilientExecutionService)
+            resilientExecutionService,
+        IServiceProvider serviceProvider)
     {
         _toolRegistry = toolRegistry;
 
@@ -55,6 +60,9 @@ public class PlannerRuntime
 
         _resilientExecutionService =
             resilientExecutionService;
+
+        _serviceProvider =
+            serviceProvider;
     }
 
     public async Task ExecuteWorkflowAsync(
@@ -115,49 +123,105 @@ public class PlannerRuntime
                         .ValidateAsync(planStep);
 
                 if (!policyResult.IsAllowed)
-                {
-                    var blockedStep =
-                        new PlannerExecutionStepModel
-                        {
-                            StepNumber =
-                                planStep.StepNumber,
+{
+    if (policyResult.Reason
+        .Contains("Approval required"))
+    {
+        var approval =
+            new WorkflowApprovalModel
+            {
+                ApprovalId =
+                    Guid.NewGuid(),
 
-                            ToolName =
-                                planStep.ToolName,
+                WorkflowId =
+                    state.WorkflowId,
 
-                            Status = "Blocked",
+                ToolName =
+                    planStep.ToolName,
 
-                            Result =
-                                policyResult.Reason
-                        };
+                CreatedAtUtc =
+                    DateTime.UtcNow
+            };
 
-                    _workflowStateService
-                        .AddStepResult(
-                            state,
-                            blockedStep);
+        var approvalRepository =
+            _serviceProvider
+                .GetRequiredService<
+                    IWorkflowApprovalRepository>();
 
-                    await _telemetryService
-                        .TrackEventAsync(
-                        new WorkflowExecutionEventModel
-                        {
-                            WorkflowId =
-                                state.WorkflowId,
+        await approvalRepository
+            .CreateAsync(approval);
 
-                            TimestampUtc =
-                                DateTime.UtcNow,
+        state.Status =
+            "WaitingForApproval";
 
-                            EventType =
-                                "StepBlocked",
+        await _repository
+            .SaveAsync(state);
 
-                            ToolName =
-                                planStep.ToolName,
+        await _telemetryService
+            .TrackEventAsync(
+            new WorkflowExecutionEventModel
+            {
+                WorkflowId =
+                    state.WorkflowId,
 
-                            Message =
-                                policyResult.Reason
-                        });
+                TimestampUtc =
+                    DateTime.UtcNow,
 
-                    continue;
-                }
+                EventType =
+                    "WorkflowSuspended",
+
+                ToolName =
+                    planStep.ToolName,
+
+                Message =
+                    $"Approval required for {planStep.ToolName}"
+            });
+
+        return;
+    }
+
+    var blockedStep =
+        new PlannerExecutionStepModel
+        {
+            StepNumber =
+                planStep.StepNumber,
+
+            ToolName =
+                planStep.ToolName,
+
+            Status = "Blocked",
+
+            Result =
+                policyResult.Reason
+        };
+
+    _workflowStateService
+        .AddStepResult(
+            state,
+            blockedStep);
+
+    await _telemetryService
+        .TrackEventAsync(
+        new WorkflowExecutionEventModel
+        {
+            WorkflowId =
+                state.WorkflowId,
+
+            TimestampUtc =
+                DateTime.UtcNow,
+
+            EventType =
+                "StepBlocked",
+
+            ToolName =
+                planStep.ToolName,
+
+            Message =
+                policyResult.Reason
+        });
+
+    continue;
+}
 
                 var tool =
                     _toolRegistry.GetTool(

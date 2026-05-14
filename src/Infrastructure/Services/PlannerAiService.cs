@@ -84,6 +84,11 @@ Each step contains:
 - toolName
 - parameters
 - dependsOnMemoryKeys
+- conditionMemoryKey
+- conditionEquals
+
+conditionMemoryKey and
+conditionEquals are optional.
 
 Rules:
 
@@ -125,6 +130,44 @@ for memory-driven tools.
 
 Never duplicate memory values
 inside parameters.
+
+Conditional execution:
+
+Use conditionMemoryKey and
+conditionEquals when execution
+depends on previous results.
+
+Example:
+
+Tool:
+GenerateFollowUpEmail
+
+dependsOnMemoryKeys:
+
+[
+   "Opportunity",
+   "AssessOpportunityRisk"
+]
+
+conditionMemoryKey:
+
+AssessOpportunityRisk
+
+conditionEquals:
+
+High
+
+If user says:
+
+if risk is high create email
+
+planner should generate:
+
+conditionMemoryKey:
+AssessOpportunityRisk
+
+conditionEquals:
+High
 
 Do not include explanations.
 

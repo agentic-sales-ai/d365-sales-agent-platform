@@ -110,6 +110,48 @@ public class PlannerRuntime
                 await _repository
                     .SaveAsync(state);
 
+                if (!string.IsNullOrWhiteSpace(
+                        planStep.ConditionMemoryKey))
+                {
+                    var memoryValue =
+                        _workflowStateService
+                            .GetMemoryValue(
+                                state,
+                                planStep.ConditionMemoryKey);
+
+                    var currentValue =
+                        memoryValue?.ToString();
+
+                    if (!string.Equals(
+                            currentValue,
+                            planStep.ConditionEquals,
+                            StringComparison
+                                .OrdinalIgnoreCase))
+                    {
+                        await _telemetryService
+                            .TrackEventAsync(
+                            new WorkflowExecutionEventModel
+                            {
+                                WorkflowId =
+                                    state.WorkflowId,
+
+                                TimestampUtc =
+                                    DateTime.UtcNow,
+
+                                EventType =
+                                    "StepSkipped",
+
+                                ToolName =
+                                    planStep.ToolName,
+
+                                Message =
+                                    "Skipped due to condition mismatch"
+                            });
+
+                        continue;
+                    }
+                }
+
                 await _telemetryService
                     .TrackEventAsync(
                     new WorkflowExecutionEventModel
@@ -158,23 +200,23 @@ public class PlannerRuntime
                             "Approval required"))
                     {
                         var approval =
-    new WorkflowApprovalModel
-    {
-        ApprovalId =
-            Guid.NewGuid(),
+                            new WorkflowApprovalModel
+                            {
+                                ApprovalId =
+                                    Guid.NewGuid(),
 
-        WorkflowId =
-            state.WorkflowId,
+                                WorkflowId =
+                                    state.WorkflowId,
 
-        ToolName =
-            planStep.ToolName,
+                                ToolName =
+                                    planStep.ToolName,
 
-        Status =
-            "Pending",
+                                Status =
+                                    "Pending",
 
-        CreatedAtUtc =
-            DateTime.UtcNow
-    };
+                                CreatedAtUtc =
+                                    DateTime.UtcNow
+                            };
 
                         await _approvalRepository
                             .CreateAsync(
@@ -316,22 +358,22 @@ public class PlannerRuntime
                             executionStep);
 
                     if (planStep.ToolName ==
-    "GetOpportunity")
-{
-    _workflowStateService
-        .SetMemoryValue(
-            state,
-            "Opportunity",
-            result);
-}
-else
-{
-    _workflowStateService
-        .SetMemoryValue(
-            state,
-            planStep.ToolName,
-            result);
-}
+                        "GetOpportunity")
+                    {
+                        _workflowStateService
+                            .SetMemoryValue(
+                                state,
+                                "Opportunity",
+                                result);
+                    }
+                    else
+                    {
+                        _workflowStateService
+                            .SetMemoryValue(
+                                state,
+                                planStep.ToolName,
+                                result);
+                    }
 
                     await _repository
                         .SaveAsync(state);

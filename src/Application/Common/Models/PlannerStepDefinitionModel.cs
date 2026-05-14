@@ -12,4 +12,16 @@ public class PlannerStepDefinitionModel
 
     public List<string>
         DependsOnMemoryKeys { get; set; } = [];
+
+    public string? ConditionMemoryKey
+    {
+        get;
+        set;
+    }
+
+    public string? ConditionEquals
+    {
+        get;
+        set;
+    }
 }
